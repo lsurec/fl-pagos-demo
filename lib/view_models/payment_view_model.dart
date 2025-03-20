@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:fl_pagos_demo/models/banco_model.dart';
 import 'package:fl_pagos_demo/models/cuenta_banco_model.dart';
 import 'package:fl_pagos_demo/models/forma_pago_model.dart';
@@ -11,64 +13,76 @@ import 'package:flutter/material.dart';
 
 class PaymentViewModel extends ChangeNotifier {
   final List<FormaPagoModel> formasPago = []; //formas de pago disponibles
-  final List<MontoModel> montos = [];
+  final List<MontoModel> montos = []; //Formas de pago agregadas
   final List<RadioCuentaBancoModel> cuentas =
       []; //cuentas bancarias disponibles
-  final List<RadioBancoModel> bancos = [];
+  final List<RadioBancoModel> bancos = []; //bancos disponibles
   FormaPagoModel? pago; //Pago seleccionado
-  BancoModel? banco;
-  CuentaBancoModel? cuenta;
-
-  bool selectAllMontos = false;
-  final TextEditingController montoController = TextEditingController();
-  final TextEditingController autorizacionController = TextEditingController();
-  final TextEditingController referecniaController = TextEditingController();
+  BancoModel? banco; //banco seleccionado
+  CuentaBancoModel? cuenta; //cuenta bancaria seleciionada
+  bool selectAllMontos =
+      false; //seleccionar todas laas formas de pago agregadas
+  final TextEditingController montoController =
+      TextEditingController(); //contorllador input monto
+  final TextEditingController autorizacionController =
+      TextEditingController(); //controlador input autorizacion
+  final TextEditingController referecniaController =
+      TextEditingController(); //controlador input referencia
 
   //Totales globales
-
-  double total = 3145.89;
-  double saldo = 0;
-  double cambio = 0;
-  double pagado = 0;
+  double total =
+      3145.89; //TODO:Total a pagar/Total documento, modificar para probar
+  double saldo = 0; //Saldo por pagar
+  double cambio = 0; //cambio por sobrepago
+  double pagado = 0; //Monto pagado
 
   //Llave para el estado del formulario montos
   GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
-  //Valida si el forumario es correcto
+  //Valida si el forumario montos es correcto
   bool isValidForm() {
     return formKey.currentState?.validate() ?? false;
   }
 
   //Cargar formas de pago
   Future<void> loadPayments(BuildContext context) async {
+    //Reestablecer valores en las pantallas
     restartValues();
+    //Limmmpiar montos agregados
     montos.clear();
+    //limpiar formas de pago disponibles
     formasPago.clear();
     //TODO:Cargar formas de pago de servicios rest
     formasPago.addAll(
+      //asignar formas de pago encontradas
       formasPagoProvider.map((item) => FormaPagoModel.fromMap(item)).toList(),
     );
 
+    //asignar el total a pagar al saldo pendiente de pago
     saldo = total;
 
+    //ectualizar estado
     notifyListeners();
   }
 
-  //Seleccionar una forma de pago agregada
+  //Seleccionar o no un pago agregado
   void changeCheckedamount(
-    bool? value,
-    int index,
+    bool? value, //nuevo valor
+    int index, //indice de la lsita
   ) {
     //cambiar valor segun checkbox
     montos[index].checked = value!;
+    //actualizar estado
     notifyListeners();
   }
 
   //eliminar formas de pago seleccioandas
   void deleteAmount(BuildContext context) async {
+    //lista de montos seleccioandos
     List<MontoModel> montosSeleccionados =
         montos.where((monto) => monto.checked).toList();
 
+    //validar si hay transacciones seleccionadas
     if (montosSeleccionados.isEmpty) {
       showSnackbar(context, "Selecciona por lo menos un monto.");
       return;
@@ -119,9 +133,10 @@ class PaymentViewModel extends ChangeNotifier {
       saldo = total - pagado;
     }
 
-    //Agregar valores a los inputs
+    //Agregar nuevo monto al input onto
     montoController.text = saldo.toStringAsFixed(2);
 
+    //actualizar estado
     notifyListeners();
   }
 
@@ -133,6 +148,8 @@ class PaymentViewModel extends ChangeNotifier {
     for (var element in montos) {
       element.checked = selectAllMontos;
     }
+
+    //actualizar estado
     notifyListeners();
   }
 
@@ -145,22 +162,30 @@ class PaymentViewModel extends ChangeNotifier {
     //marcar el seleccionado en verdadero
     cuentas[value!].isSelected = true;
 
+    //guardar cuenta seleccionada
     cuenta = cuentas.firstWhere((check) => check.isSelected).account;
 
+    //actualizar estado
     notifyListeners();
   }
 
+  //Ver formulario de pagos
   Future<void> navigateAmountView(
     BuildContext context,
     FormaPagoModel forma,
   ) async {
-    //limpiar cuentas
+    //asignar forma de pago seleccionada
     pago = forma;
+    //limpiar cuentas disponibles
     cuentas.clear();
+    //limpiar cuenta seleccionada
     cuenta = null;
+    //limpiar banco seleccionado
     banco = null;
+    //limpiar bancos disponobles
     bancos.clear();
 
+    //Actualizar estado
     notifyListeners();
 
     //TODO:validar que haya una cuenta correntista seleccionada
@@ -170,18 +195,19 @@ class PaymentViewModel extends ChangeNotifier {
     //TODO:Si la forma de pago es cuenta corriente y la cuenta correntista permite CxC
     //TODO:Validar que el monto que se paga esté dentro del limite de credito de la cuenta correntista
 
-    //validaciones para poder navegar a la pantalla
+    //si no hay total que pagar mostrar mensjae
     if (total == 0) {
       showSnackbar(context, "El total a pagar es 0.");
-
       return;
     }
 
+    //si no hay saldo pendiente de pago mostrar mensjae
     if (saldo == 0) {
       showSnackbar(context, "El saldo a pagar es 0");
       return;
     }
 
+    //si la forma de pago requier banco , buscar bancos
     if (forma.banco) {
       //TODO:Cargar bancos de api rest
       bancos.clear();
@@ -198,13 +224,14 @@ class PaymentViewModel extends ChangeNotifier {
       //agregar lista de bancos a lista de radios
     }
 
-    //Navegar a la pantalla siguiente
+    //Navegar a la pantalla siguiente (fromualrio montos)
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const AmountView()),
     );
   }
 
+  //mostarr mensajes en snackBar
   showSnackbar(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -213,13 +240,17 @@ class PaymentViewModel extends ChangeNotifier {
     );
   }
 
+  //Seleccionar banco
   void changeBanco(
     int value,
     BuildContext context,
   ) {
+    //limpair cuentas selccionadas
     cuenta = null;
+    //limpiar cuentas disponibles
     cuentas.clear();
-    //Maracr todos en falso
+
+    //marcar todos los bancos como no sleccionado
     for (var bank in bancos) {
       bank.isSelected = false;
     }
@@ -227,7 +258,7 @@ class PaymentViewModel extends ChangeNotifier {
     //marcar el selecccionado en verdadero
     bancos[value].isSelected = true;
 
-    //Buscar el seleccionado
+    //Buscar el seleccionado y guardar
     banco = bancos.firstWhere((bank) => bank.isSelected).bank;
 
     //verificar si cuenta bancario es null conevrtirlo en false
@@ -250,9 +281,11 @@ class PaymentViewModel extends ChangeNotifier {
       }
     }
 
+    //actualizar estado
     notifyListeners();
   }
 
+  //agregar una forma de pago
   void addAmount(
     BuildContext context,
   ) {
@@ -267,6 +300,7 @@ class PaymentViewModel extends ChangeNotifier {
         return;
       }
 
+      //si se rquiere cuenta bancaria pero no se selcciona mostrar mensjae
       if (pago!.reqCuentaBancaria) {
         if (cuenta == null) {
           showSnackbar(context, "Por favor selcciona una cuenta bancaria.");
@@ -298,22 +332,26 @@ class PaymentViewModel extends ChangeNotifier {
       bank: banco,
       //si es requerido
       account: cuenta,
+      //cambio
       difference: diference,
     );
 
     //Agregar monto a lista de montos
     montos.add(amount); //agregar a lista
 
+    //Limmpiar todos los valores de una forma de pago (reinciar flujo)
     restartValues();
+    //calcular totales
     calculateTotal(context);
-    //mensaje usuario
 
+    //Mensaje
     showSnackbar(context, "Pago agregado");
 
-    //regresar pantalla anterior
+    //regresar pantalla anterior (formas de pago)
     Navigator.pop(context);
   }
 
+  //Limpiar valores
   restartValues() {
     montoController.text = "";
     referecniaController.text = "";
